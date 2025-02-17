@@ -486,10 +486,10 @@ func findFile(files []*zip.File, target string) *zip.File {
 	return nil
 }
 
-func docx2md(arg string, embed bool) error {
-	r, err := zip.OpenReader(arg)
+func Docx2md(fileToConvert string, embedResources bool) (string, error) {
+	r, err := zip.OpenReader(fileToConvert)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer r.Close()
 
@@ -504,12 +504,12 @@ func docx2md(arg string, embed bool) error {
 
 			b, _ := io.ReadAll(rc)
 			if err != nil {
-				return err
+				return "", err
 			}
 
 			err = xml.Unmarshal(b, &rels)
 			if err != nil {
-				return err
+				return "", err
 			}
 		case "word/numbering.xml":
 			rc, err := f.Open()
@@ -517,23 +517,23 @@ func docx2md(arg string, embed bool) error {
 
 			b, _ := io.ReadAll(rc)
 			if err != nil {
-				return err
+				return "", err
 			}
 
 			err = xml.Unmarshal(b, &num)
 			if err != nil {
-				return err
+				return "", err
 			}
 		}
 	}
 
 	f := findFile(r.File, "word/document*.xml")
 	if f == nil {
-		return errors.New("incorrect document")
+		return "", errors.New("incorrect document")
 	}
 	node, err := readFile(f)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	var buf bytes.Buffer
@@ -541,16 +541,14 @@ func docx2md(arg string, embed bool) error {
 		r:     r,
 		rels:  rels,
 		num:   num,
-		embed: embed,
+		embed: embedResources,
 		list:  make(map[string]int),
 	}
 	err = zf.walk(node, &buf)
 	if err != nil {
-		return err
+		return "", err
 	}
-	fmt.Print(buf.String())
-
-	return nil
+	return buf.String(), nil
 }
 
 func main() {
@@ -568,7 +566,9 @@ func main() {
 		os.Exit(1)
 	}
 	for _, arg := range flag.Args() {
-		if err := docx2md(arg, embed); err != nil {
+		if res, err := Docx2md(arg, embed); err == nil {
+			fmt.Print(res)
+		} else {
 			log.Fatal(err)
 		}
 	}
